@@ -1,0 +1,246 @@
+#!/usr/bin/python
+
+import sys
+import os
+import datetime
+import xml.dom.minidom
+import xnnppx
+
+def xml_str(node):
+    """return the text inside an XML node"""
+    s = u''
+    for cn in node.childNodes:
+        if cn.nodeType == cn.TEXT_NODE:
+            s += cn.data
+    return s
+
+def read_parameter_file(parameters, fname):
+    """read an XNAT pipeline parameter file and store the values in 
+    the parameters dictionary"""
+    doc = xml.dom.minidom.parse(fname)
+    for node in doc.getElementsByTagName('pip:parameter'):
+        name = xml_str(node.getElementsByTagName('pip:name')[0])
+        values = node.getElementsByTagName('pip:values')[0]
+        unique = values.getElementsByTagName('pip:unique')
+        if unique:
+            values = [xml_str(unique[0])]
+        else:
+            values = []
+            for el in values.getElementsByTagName('pip:list'):
+                values.append(xml_str(el))
+        parameters.setdefault(name, []).extend(values)
+    return
+
+def print_usage():
+    print
+    print 'usage: %s <arguments ...>' % progname
+    print '       %s -help' % progname
+    print
+    print 'required arguments:'
+    print
+    print '    -dataType <data type>: XNAT data type for which pipeline has been launched'
+    print '    -host <URL>: URL of XNAT web site'
+    print '    -id <id>: XNAT ID which uniquely identifies the dataType'
+    print '    -label <label>: XNAT label for the dataType'
+    print '    -pipeline <path>: path to the pipeline XML file'
+    print '    -project <project>: XNAT project to which this id belongs'
+    print '    -pwd <password>: XNAT password'
+    print '    -u <user name>: XNAT username'
+    print
+    print 'optional arguments:'
+    print
+    print '    -catalogPath <directory>: path to pipeline XMLs'
+    print '    -config <path>: properties configuration file'
+    print '    -parameter <name>=<value[,value[...]]>: set a pipeline parameter'
+    print '    -parameterFile <path>: path to a parameter file'
+    print '    -supressNotification: do not send pipeline completion/failure notices'
+    print '    -notify <address>: add a notification address (may be specified more than once)'
+    print '    -help: show this message and exit'
+    print
+    print 'all output redirected to a file in %s/logs ' % log_dir
+    print 'unless the environment variable XNAT_NIPYPE_NOLOG is set, in which '
+    print 'case output is sent to stdout and stderr untouched'
+    print
+    return
+
+def notification_info():
+    """format pipeline arguments and parameters for a notification email"""
+    if log_file is None:
+        info = 'no log file (output is stdout/stderr)\n'
+    else:
+        info = 'log file: %s\n' % log_file
+    info += '\n'
+    info += 'arguments:\n'
+    info += '\n'
+    for key in sorted(xnnppx.arguments):
+        if key == 'pwd':
+            info += '    pwd = ********\n'
+        else:
+            info += '    %s = %s\n' % (key, str(xnnppx.arguments[key]))
+    info += '\n'
+    info += 'arguments:\n'
+    info += '\n'
+    for key in sorted(xnnppx.parameters):
+        info += '    %s = %s\n' % (key, str(xnnppx.parameters[key]))
+    return info
+
+###########################################################################
+# definitions and defaults
+#
+
+# make a copy that we can pop() off of in this script -- some submodules 
+# need sys.argv intact
+argv = list(sys.argv)
+
+progname = os.path.basename(argv.pop(0))
+
+required_arguments = ('-pipeline', '-dataType', '-id', '-label', '-project', 
+                      '-u', '-pwd', '-host')
+optional_arguments = ('-config', '-catalogPath')
+
+arguments = {'notify_flag': True,
+             'notify_emails': [], 
+             'config': '/home/vmuser/xnat_1_5_2/pipeline/pipeline.config'}
+parameters = {}
+config = {}
+log_dir = '%s/logs' % os.path.dirname(arguments['config'])
+log_file = None
+
+###########################################################################
+# command line and log file
+#
+
+if not argv or argv[0] == '-help':
+    print_usage()
+    sys.exit(1)
+
+if os.getenv('XNAT_NIPYPE_NOLOG') is None:
+    now = datetime.datetime.now()
+    log_file = '%s/pipeline_%s.log' % (log_dir, 
+                                       now.strftime('%Y_%m_%d_%H_%M_%S'))
+    fo = open(log_file, 'w')
+    os.dup2(fo.fileno(), 1)
+    os.dup2(fo.fileno(), 2)
+
+while argv:
+    arg = argv.pop(0)
+    if arg == '-supressNotification':
+        arguments['notify_flag'] = False
+    elif arg == '-notify':
+        try:
+            arguments['notify_emails'].append(argv.pop(0))
+        except IndexError:
+            sys.stderr.write('%s: %s requires an argument\n' % (progname, arg))
+            sys.exit(1)
+    elif arg in required_arguments or arg in optional_arguments:
+        try:
+            arguments[arg[1:]] = argv.pop(0)
+        except IndexError:
+            sys.stderr.write('%s: %s requires an argument\n' % (progname, arg))
+            sys.exit(1)
+    elif arg == '-parameter':
+        try:
+            (name, value) = argv.pop(0).split('=', 1)
+        except IndexError:
+            sys.stderr.write('%s: %s requires an argument\n' % (progname, arg))
+            sys.exit(1)
+        except ValueError:
+            sys.stderr.write('%s: parameter argument must be name=value(s)' % progname)
+            sys.exit(1)
+        parameters.setdefault(name, []).extend(value.split(','))
+    elif arg == '-parameterFile':
+        try:
+            read_parameter_file(parameters, argv.pop(0))
+        except IndexError:
+            sys.stderr.write('%s: -parameterFile requires an argument\n' % progname)
+            sys.exit(1)
+    elif arg == '-help':
+        print_usage()
+        sys.exit(0)
+    else:
+        sys.stderr.write('%s: unknown flag %s\n' % (progname, arg))
+        sys.exit(1)
+
+for arg in required_arguments:
+    if arg[1:] not in arguments:
+        sys.stderr.write('%s: missing argument %s\n' % (progname, arg))
+        sys.exit(1)
+
+try:
+    line_no = 0
+    for line in open(arguments['config']):
+        line_no += 1
+        line = line.strip()
+        try:
+            (name, value) = line.split('=', 1)
+        except ValueError:
+            sys.stderr.write('%s: error on line %d of configuration file\n' % (progname, line_no))
+            sys.exit(1)
+        config[name.strip()] = value.strip()
+except IOError, data:
+    sys.stderr.write('%s: %s\n' % (progname, str(data)))
+    sys.exit(1)
+
+###########################################################################
+# set up the xnnppx module
+#
+
+try:
+    catalog_path = arguments['catalogPath']
+except KeyError:
+    catalog_path = config['PIPELINE_CATALOG_ROOT_PATH']
+
+try:
+    xnnppx.mail_host = parameters['mailhost'][0]
+except KeyError:
+    xnnppx.mail_host = config['PIPELINE_SMTP_HOST']
+
+try:
+    xnnppx.from_email = parameters['adminemail'][0]
+except KeyError:
+    xnnppx.from_email = config['ADMIN_EMAIL']
+
+xnnppx.parameters = parameters
+xnnppx.arguments = arguments
+xnnppx.workflow_info = xnnppx.WorkflowInfo(arguments['host'], 
+                                           arguments['u'], 
+                                           arguments['pwd'], 
+                                           arguments['id'])
+
+###########################################################################
+# find and execute the pipeline
+#
+
+if arguments['pipeline'].startswith('/'):
+    pipeline_xml = arguments['pipeline']
+else:
+    pipeline_xml = '%s/%s' % (catalog_path, arguments['pipeline']) 
+if not pipeline_xml.endswith('.xml'):
+    sys.stderr.write("%s: pipeline does not end with .xml; can't generate python file name\n" % progname)
+    sys.exit(1)
+pipeline_py = pipeline_xml[:-4] + '.py'
+
+xnnppx.workflow_info.set_environment(arguments, parameters)
+
+try:
+    execfile(pipeline_py)
+except:
+    if log_file is None:
+        xnnppx.workflow_info.fail()
+    else:
+        xnnppx.workflow_info.fail('see %s for errors' % log_file)
+    if arguments['notify_flag']:
+        xnnppx.send_mail(arguments['notify_emails'], 
+                         'Pipeline failed', 
+                         notification_info())
+    raise
+
+xnnppx.workflow_info.complete()
+if arguments['notify_flag']:
+    xnnppx.send_mail(arguments['notify_emails'], 
+                     'Pipeline complete', 
+                     notification_info())
+
+sys.exit(0)
+
+# eof

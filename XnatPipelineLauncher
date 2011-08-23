@@ -1,0 +1,15 @@
+#!/bin/bash
+
+pipeline_home=/home/vmuser/xnat_1_5_2/pipeline
+
+xml=`echo "$@" | tr ' ' '\n' | grep -A 1 -e '-pipeline' | tail -1`
+py=`echo "$xml" | sed 's/xml$/py/'`
+
+if [ -f $py ]
+then
+    $pipeline_home/bin/XnatNipypeLauncher "$@"
+else
+    $pipeline_home/bin/XnatNipypeLauncher.bin "$@"
+fi
+
+# eof
