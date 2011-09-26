@@ -3,6 +3,7 @@
 
 import sys
 import os
+import traceback
 import datetime
 import urllib2
 import smtplib
@@ -274,7 +275,6 @@ class LinearPlugin(nipype.pipeline.plugins.linear.LinearPlugin):
                 donotrun.extend(subnodes)
         report_nodes_not_run(notrun)
 
-
 def send_mail(to_addrs, subject, body):
     if not to_addrs:
         return
@@ -288,5 +288,50 @@ def send_mail(to_addrs, subject, body):
     s.sendmail(from_email, to_addrs, message.as_string())
     s.quit()
     return
+
+def notification_info():
+    """format pipeline arguments and parameters for a notification email"""
+    if log_file is None:
+        info = 'no log file (output is stdout/stderr)\n'
+    else:
+        info = 'log file: %s\n' % log_file
+    info += '\n'
+    info += 'arguments:\n'
+    info += '\n'
+    for key in sorted(arguments):
+        if key == 'pwd':
+            info += '    pwd = ********\n'
+        else:
+            info += '    %s = %s\n' % (key, str(arguments[key]))
+    info += '\n'
+    info += 'arguments:\n'
+    info += '\n'
+    for key in sorted(parameters):
+        info += '    %s = %s\n' % (key, str(parameters[key]))
+    return info
+
+class ContextManager:
+
+    def __enter__(self):
+        return
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            workflow_info.complete()
+            if arguments['notify_flag']:
+                send_mail(arguments['notify_emails'],
+                          'Pipeline complete',
+                          notification_info())
+        else:
+            if log_file is None:
+                workflow_info.fail()
+            else:
+                workflow_info.fail('see %s for errors' % log_file)
+            if arguments['notify_flag']:
+                send_mail(arguments['notify_emails'],
+                          'Pipeline failed',
+                          notification_info())
+                sys.stderr.write(''.join(traceback.format_exception(exc_type, exc_val, exc_tb)))
+        return
 
 # eof

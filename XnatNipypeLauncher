@@ -60,32 +60,11 @@ def print_usage():
     print '    -notify <address>: add a notification address (may be specified more than once)'
     print '    -help: show this message and exit'
     print
-    print 'all output redirected to a file in %s/logs ' % log_dir
+    print 'all output redirected to a file in %s' % log_dir
     print 'unless the environment variable XNAT_NIPYPE_NOLOG is set, in which '
     print 'case output is sent to stdout and stderr untouched'
     print
     return
-
-def notification_info():
-    """format pipeline arguments and parameters for a notification email"""
-    if log_file is None:
-        info = 'no log file (output is stdout/stderr)\n'
-    else:
-        info = 'log file: %s\n' % log_file
-    info += '\n'
-    info += 'arguments:\n'
-    info += '\n'
-    for key in sorted(xnnppx.arguments):
-        if key == 'pwd':
-            info += '    pwd = ********\n'
-        else:
-            info += '    %s = %s\n' % (key, str(xnnppx.arguments[key]))
-    info += '\n'
-    info += 'arguments:\n'
-    info += '\n'
-    for key in sorted(xnnppx.parameters):
-        info += '    %s = %s\n' % (key, str(xnnppx.parameters[key]))
-    return info
 
 ###########################################################################
 # definitions and defaults
@@ -103,7 +82,7 @@ optional_arguments = ('-config', '-catalogPath')
 
 arguments = {'notify_flag': True,
              'notify_emails': [], 
-             'config': '/home/vmuser/xnat_1_5_2/pipeline/pipeline.config'}
+             'config': '/home/vmuser/xnat/pipeline/pipeline.config'}
 parameters = {}
 config = {}
 log_dir = '%s/logs' % os.path.dirname(arguments['config'])
@@ -203,6 +182,7 @@ try:
 except KeyError:
     xnnppx.from_email = config['ADMIN_EMAIL']
 
+xnnppx.log_file = log_file
 xnnppx.parameters = parameters
 xnnppx.arguments = arguments
 xnnppx.workflow_info = xnnppx.WorkflowInfo(arguments['host'], 
@@ -225,24 +205,7 @@ pipeline_py = pipeline_xml[:-4] + '.py'
 
 xnnppx.workflow_info.set_environment(arguments, parameters)
 
-try:
-    execfile(pipeline_py)
-except:
-    if log_file is None:
-        xnnppx.workflow_info.fail()
-    else:
-        xnnppx.workflow_info.fail('see %s for errors' % log_file)
-    if arguments['notify_flag']:
-        xnnppx.send_mail(arguments['notify_emails'], 
-                         'Pipeline failed', 
-                         notification_info())
-    raise
-
-xnnppx.workflow_info.complete()
-if arguments['notify_flag']:
-    xnnppx.send_mail(arguments['notify_emails'], 
-                     'Pipeline complete', 
-                     notification_info())
+execfile(pipeline_py)
 
 sys.exit(0)
 
