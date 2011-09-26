@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# See file COPYING distributed with the xnnppx package for the copyright 
+# and license.
+
 pipeline_home=/home/vmuser/xnat_1_5_2/pipeline
 
 xml=`echo "$@" | tr ' ' '\n' | grep -A 1 -e '-pipeline' | tail -1`

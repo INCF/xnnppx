@@ -1,3 +1,6 @@
+# See file COPYING distributed with the xnnppx package for the copyright 
+# and license.
+
 import sys
 import os
 import datetime
