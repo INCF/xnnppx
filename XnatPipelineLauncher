@@ -3,7 +3,7 @@
 # See file COPYING distributed with the xnnppx package for the copyright 
 # and license.
 
-pipeline_home=/home/vmuser/xnat_1_5_2/pipeline
+pipeline_home=/home/vmuser/xnat/pipeline
 
 xml=`echo "$@" | tr ' ' '\n' | grep -A 1 -e '-pipeline' | tail -1`
 py=`echo "$xml" | sed 's/xml$/py/'`
@@ -14,5 +14,7 @@ then
 else
     $pipeline_home/bin/XnatPipelineLauncher.orig "$@"
 fi
+
+exit $?
 
 # eof
