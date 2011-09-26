@@ -1,0 +1,12 @@
+{'name': 'recon_all', 
+ 'description': 'freesurfer recon-all', 
+ 'location': '/home/vmuser/xnat/pipeline/catalog/candi-store', 
+ 'authors': ['Haselgrove, Christian'], 
+ 'version': '0.1', 
+ 'appliesTo': 'xnat:mrSessionData', 
+ 'input-parameters': [
+    {'name': 'session', 'values': ('s', 'xnat:experimentData/ID'), 'description': 'Experiment ID'}, 
+    {'name': 'sessionLabel', 'values': ('s', 'xnat:experimentData/label'), 'description': 'Session Label'}, 
+    {'name': 'xnat_project', 'values': ('s', 'xnat:experimentData/project'), 'description': 'Project ID'}
+ ]
+}

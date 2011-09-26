@@ -1,0 +1,124 @@
+#!/usr/bin/python
+
+# See file COPYING distributed with the xnnppx package for the copyright 
+# and license.
+
+import sys
+import os
+try:
+    import yaml
+    have_yaml = True
+except:
+    have_yaml = False
+import xml.dom.minidom
+
+def create_simple_element(doc, name, value):
+    element = doc.createElement(name)
+    element.appendChild(doc.createTextNode(value))
+    return element
+
+base_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<Pipeline xmlns="http://nrg.wustl.edu/pipeline" xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://nrg.wustl.edu/pipeline ..\schema\pipeline.xsd"  xmlns:fileUtils="http://www.xnat.org/java/org.nrg.imagingtools.utils.FileUtils">
+</Pipeline>
+"""
+
+progname = os.path.basename(sys.argv.pop(0))
+
+if len(sys.argv) == 0 or len(sys.argv) > 2:
+    print
+    print 'usage: %s <source file> [output file]' % progname
+    print
+    print 'source file may be python or YAML (if available)'
+    print
+    sys.exit(1)
+
+in_fname = sys.argv.pop(0)
+
+try:
+    data = open(in_fname).read()
+except IOError, data:
+    sys.stderr.write('%s: %s\n' % (progname, str(data)))
+    sys.exit(1)
+
+try:
+    info = eval(data)
+except SyntaxError:
+    if have_yaml:
+        try:
+            info = yaml.load(data)
+        except yaml.scanner.ScannerError:
+            sys.stderr.write("%s: couldn't interpret data in %s\n" % (progname, in_fname))
+            sys.exit(1)
+    else:
+        sys.stderr.write("%s: couldn't interpret data in %s\n" % (progname, in_fname))
+        sys.exit(1)
+
+doc = xml.dom.minidom.parseString(base_xml)
+pn = doc.getElementsByTagName('Pipeline')[0]
+
+pn.appendChild(create_simple_element(doc, 'name', info['name']))
+pn.appendChild(create_simple_element(doc, 'location', info['location']))
+pn.appendChild(create_simple_element(doc, 'description', info['description']))
+
+documentation = doc.createElement('documentation')
+pn.appendChild(documentation)
+
+if info.has_key('authors'):
+    authors = doc.createElement('authors')
+    for fullname in info['authors']:
+        a = doc.createElement('author')
+        (lastname, firstname) = fullname.split(',', 1)
+        a.appendChild(create_simple_element(doc, 'lastname', lastname))
+        a.appendChild(create_simple_element(doc, 'firstname', firstname))
+        authors.appendChild(a)
+    documentation.appendChild(authors)
+
+if info.has_key('version'):
+    documentation.appendChild(create_simple_element(doc, 'version', info['version']))
+
+if info.has_key('input-parameters'):
+    input_parameters = doc.createElement('input-parameters')
+    for ip_d in info['input-parameters']:
+        ip = doc.createElement('parameter')
+        ip.appendChild(create_simple_element(doc, 'name', ip_d['name']))
+        vals = doc.createElement('values')
+        if ip_d['values'][0] == 's':
+            vals.appendChild(create_simple_element(doc, 'schemalink', ip_d['values'][1]))
+        elif ip_d['values'][0] == 'v':
+            vals.appendChild(create_simple_element(doc, 'csv', ip_d['values'][1]))
+        else:
+            sys.stderr.write('%s: bad value type \"%s\"\n' % (progname, ip_d['values'][0]))
+            sys.exit(1)
+        ip.appendChild(vals)
+        ip.appendChild(create_simple_element(doc, 'description', ip_d['description']))
+        input_parameters.appendChild(ip)
+    documentation.appendChild(input_parameters)
+
+if info.has_key('appliesTo'):
+    applies_to = doc.createElement('xnatInfo')
+    applies_to.setAttribute('appliesTo', info['appliesTo'])
+    pn.appendChild(applies_to)
+
+parameters = doc.createElement('parameters')
+pn.appendChild(parameters)
+steps = doc.createElement('steps')
+pn.appendChild(steps)
+step = doc.createElement('step')
+step.setAttribute('id', '0')
+step.setAttribute('description', 'bogus step for validation')
+steps.appendChild(step)
+
+if sys.argv:
+    try:
+        fo = open(sys.argv[0], 'w')
+        fo.write(doc.toxml())
+        fo.close()
+    except IOError, data:
+        sys.stderr.write('%s: %s\n' % (progname, str(data)))
+        sys.exit(1)
+else:
+    print doc.toxml()
+
+sys.exit(0)
+
+# eof
