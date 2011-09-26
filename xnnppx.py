@@ -166,9 +166,9 @@ class WorkflowInfo:
         workflow_node.setAttribute('status', 'Running')
         t = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         workflow_node.setAttribute('current_step_launch_time', t)
-        workflow_node.setAttribute('current_step_id', step_id)
+        workflow_node.setAttribute('current_step_id', str(step_id))
         workflow_node.setAttribute('step_description', step_description)
-        workflow_node.setAttribute('percentageComplete', percent_complete)
+        workflow_node.setAttribute('percentageComplete', str(percent_complete))
         self._update_xnat()
         return
 
