@@ -7,24 +7,11 @@ import traceback
 import datetime
 import urllib2
 import smtplib
-from copy import deepcopy
 import email.mime.text
 import xml.dom.minidom
 import suds.client
 import suds.xsd.doctor
 import suds.transport.http
-import nipype.pipeline.engine
-import nipype.pipeline.plugins.linear
-from nipype.pipeline.plugins.base import report_nodes_not_run
-from nipype.pipeline.plugins.base import str2bool
-from nipype.pipeline.plugins.base import report_crash
-from nipype.pipeline.utils import nx
-from nipype.pipeline.utils import dfs_preorder
-from nipype.pipeline.engine import MapNode
-from nipype.utils.logger import config
-from nipype.utils.logger import logger
-from nipype.pipeline.utils import merge_dict
-from nipype.pipeline.utils import generate_expanded_graph
 
 class WorkflowNotFoundError(Exception):
     """workflow not found"""
@@ -201,79 +188,6 @@ class WorkflowInfo:
         self._update_xnat()
         self._close()
         return
-
-class Workflow(nipype.pipeline.engine.Workflow):
-
-    def run(self, plugin_args=None, updatehash=False):
-        """ Execute the workflow
-
-        XNAT-modified Linear runner only
-        
-        plugin_args : dictionary containing arguments to be sent to plugin
-            constructor. see individual plugin doc strings for details.
-        """
-        runner = LinearPlugin(plugin_args=plugin_args)
-        flatgraph = self._create_flat_graph()
-        self.config = merge_dict(deepcopy(config._sections), self.config)
-        logger.info(str(sorted(self.config)))
-        self._set_needed_outputs(flatgraph)
-        execgraph = generate_expanded_graph(deepcopy(flatgraph))
-        for index, node in enumerate(execgraph.nodes()):
-            node.config = self.config
-            node.base_dir = self.base_dir
-            node.index = index
-            if isinstance(node, MapNode):
-                node.use_plugin = (plugin, plugin_args)
-        self._configure_exec_nodes(execgraph)
-        self._write_report_info(self.base_dir, self.name, execgraph)
-        runner.run(execgraph, updatehash=updatehash, config=self.config)
-        return execgraph
-
-class LinearPlugin(nipype.pipeline.plugins.linear.LinearPlugin):
-
-    """Execute workflow in series
-    """
-
-    def run(self, graph, config, updatehash=False):
-        """Executes a pre-defined pipeline in a serial order.
-
-        modifed for XNAT workflow XML updates
-
-        Parameters
-        ----------
-
-        graph : networkx digraph
-            defines order of execution          
-        """
-
-        if not isinstance(graph, nx.DiGraph):
-            raise ValueError('Input must be a networkx digraph object')
-        logger.info("Running serially.")
-        old_wd = os.getcwd()
-        notrun = []
-        donotrun = []
-        nodes = nx.topological_sort(graph)
-        for (i, node) in enumerate(nodes):
-            try:
-                pct = 100.0*i/len(nodes)
-                workflow_info.update(str(i+1), str(node), '%.1f' % pct)
-                if node in donotrun:
-                    continue
-                node.run(updatehash=updatehash)
-            except:
-                os.chdir(old_wd)
-                if str2bool(config['execution']['stop_on_first_crash']):
-                    raise
-                # bare except, but i really don't know where a
-                # node might fail
-                crashfile = report_crash(node)
-                # remove dependencies from queue
-                subnodes = [s for s in dfs_preorder(graph, node)]
-                notrun.append(dict(node = node,
-                                   dependents = subnodes,
-                                   crashfile = crashfile))
-                donotrun.extend(subnodes)
-        report_nodes_not_run(notrun)
 
 def send_mail(to_addrs, subject, body):
     if not to_addrs:
