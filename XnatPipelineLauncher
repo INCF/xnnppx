@@ -12,7 +12,7 @@ if [ -f $py ]
 then
     $pipeline_home/bin/XnatNipypeLauncher "$@"
 else
-    $pipeline_home/bin/XnatNipypeLauncher.bin "$@"
+    $pipeline_home/bin/XnatPipelineLauncher.orig "$@"
 fi
 
 # eof
