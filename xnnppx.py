@@ -16,7 +16,7 @@ import suds.transport.http
 class WorkflowNotFoundError(Exception):
     """workflow not found"""
 
-class WorkflowInfo:
+class _WorkflowInfo:
 
     """class for mirroring workflow information (XML) in XNAT"""
 
@@ -225,6 +225,11 @@ def notification_info():
     return info
 
 class ContextManager:
+
+    """context manager for running pipelines
+
+    the workflow is marked complete or failed as appropriate, and a notification e-mail is sent is required by the workflow arguments
+    """
 
     def __enter__(self):
         return

@@ -185,10 +185,10 @@ except KeyError:
 xnnppx.log_file = log_file
 xnnppx.parameters = parameters
 xnnppx.arguments = arguments
-xnnppx.workflow_info = xnnppx.WorkflowInfo(arguments['host'], 
-                                           arguments['u'], 
-                                           arguments['pwd'], 
-                                           arguments['id'])
+xnnppx.workflow_info = xnnppx._WorkflowInfo(arguments['host'], 
+                                            arguments['u'], 
+                                            arguments['pwd'], 
+                                            arguments['id'])
 
 ###########################################################################
 # find and execute the pipeline
