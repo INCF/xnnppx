@@ -61,7 +61,7 @@ def print_usage():
     print '    -help: show this message and exit'
     print
     print 'all output redirected to a file in %s' % log_dir
-    print 'unless the environment variable XNAT_NIPYPE_NOLOG is set, in which '
+    print 'unless the environment variable XNAT_PYTHON_NOLOG is set, in which '
     print 'case output is sent to stdout and stderr untouched'
     print
     return
@@ -96,7 +96,7 @@ if not argv or argv[0] == '-help':
     print_usage()
     sys.exit(1)
 
-if os.getenv('XNAT_NIPYPE_NOLOG') is None:
+if os.getenv('XNAT_PYTHON_NOLOG') is None:
     now = datetime.datetime.now()
     log_file = '%s/pipeline_%s.log' % (log_dir, 
                                        now.strftime('%Y_%m_%d_%H_%M_%S'))

@@ -10,7 +10,7 @@ py=`echo "$xml" | sed 's/xml$/py/'`
 
 if [ -f $py ]
 then
-    $pipeline_home/bin/XnatNipypeLauncher "$@"
+    $pipeline_home/bin/XnatPythonLauncher "$@"
 else
     $pipeline_home/bin/XnatPipelineLauncher.orig "$@"
 fi

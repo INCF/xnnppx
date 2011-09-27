@@ -10,7 +10,7 @@ CONTENTS
 
     XnatPipelineLauncher -- The drop-in replacement script for XnatPipelineLauncher that shunts execution to a Python script, if available.
 
-    XnatNipypeLauncher -- The Python script launcher.
+    XnatPythonLauncher -- The Python script launcher.
 
     xnnppx.py -- The XNAT utility module for the Python script.
 
@@ -28,7 +28,7 @@ In $PIPELINE_HOME in your XNAT installation (typically $XNAT_HOME/pipeline), mov
 
     This step steals execution from XNAT and shunts it to Python scripts if they are available.  Otherwise it passes control back to XNAT's native pipeline launcher.
 
-Install XnatNipypeLauncher in $PIPELINE_HOME/bin with executable permissions.
+Install XnatPythonLauncher in $PIPELINE_HOME/bin with executable permissions.
 
     If XnatPipelineLauncher finds a Python script that needs to be run, it calls this script, which takes the parameters passed by XNAT and packages them in a form easily used by the Python script.
 
@@ -38,7 +38,7 @@ Install xnnppx.py in your Python path.
 
 CREATING A PYTHON PIPELINE
 
-Simply create a Python script with extension .py in the same directory as the XML pipeline descriptor (typically in $PIPELINE_HOME/catalog/...).  XnatPipelineLauncher detects this script and launches it with XnatNipypeLauncher rather than the native XNAT pipeline launcher.
+Simply create a Python script with extension .py in the same directory as the XML pipeline descriptor (typically in $PIPELINE_HOME/catalog/...).  XnatPipelineLauncher detects this script and launches it with XnatPythonLauncher rather than the native XNAT pipeline launcher.
 
 See sample.* for an example.  Install sample.py in a subdirectory of $PIPELINE_HOME/catalog, for instance $PIPELINE_HOME/catalog/local/sample.py.  XNAT will need an XML descriptor of the pipeline in order to launch it; this can be created by describing the pipeline as a Python or YAML dictionary (see sample.info) and converting it with create_workflow_xml.  Put the result in $PIPELINE_HOME/catalog/local/sample.xml.
 
@@ -46,7 +46,7 @@ The script can access the pipeline arguments and parameters in the dictionaries 
 
 xnnppx.send_mail(to_addrs, subject, body) can be used to send mail.
 
-XnatNipypeLauncher will redirect output to a log file (typically in $PIPELINE_HOME/logs), update XNAT (more specifically, the workflow XML) with the workflow execution environment and pass control to the Python script.  Once the script has started, it is then responsible for updating the workflow XML, which can be done by calling:
+XnatPythonLauncher will redirect output to a log file (typically in $PIPELINE_HOME/logs), update XNAT (more specifically, the workflow XML) with the workflow execution environment and pass control to the Python script.  Once the script has started, it is then responsible for updating the workflow XML, which can be done by calling:
 
     xnnppx.workflow_info.update(step_id, step_description, percent_complete)
 
@@ -62,4 +62,4 @@ setting up xnat
 
 REST call
 
-XNAT_NIPYPE_NOLOG
+XNAT_PYTHON_NOLOG
