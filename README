@@ -1,6 +1,6 @@
 See file COPYING distributed with the xnnppx package for the copyright and license.
 
-xnnppx is a package for launching Python scripts from XNAT (www.xnat.org).
+Xnnppx is a package for launching Python scripts from XNAT (www.xnat.org).
 
 CONTENTS
 
@@ -14,19 +14,19 @@ CONTENTS
 
     xnnppx.py -- The XNAT utility module for the Python script.
 
-    create_workflow_xml -- A utility program for converting a Python or YAML dictionary into an XML XNAT pipeline descriptor.
+    create_workflow_xml -- A utility program for converting a Python or YAML dictionary into an XML pipeline descriptor for XNAT.
 
     sample.info -- Example Python dictionary for generating an XML pipeline descriptor.
 
-    sample.py -- Example Python script.
+    sample.py -- Example Python pipeline script.
 
 INSTALLATION
 
-Install Suds: https://fedorahosted.org/suds/
+Xnnppx requires Suds: https://fedorahosted.org/suds/.
 
-In $PIPELINE_HOME in your XNAT installation (typically $XNAT_HOME/pipeline), move bin/XnatPipelineLauncher to bin/XnatPipelineLauncher.orig and install XnatPipelineLauncher in bin.  Change pipeline_home in this (new) XnatPipelineLauncher and make sure this file has executable permissions.
+In $PIPELINE_HOME (typically $XNAT_HOME/pipeline), move bin/XnatPipelineLauncher to bin/XnatPipelineLauncher.orig and replace it with XnatPipelineLauncher from this distribution.  Change pipeline_home in this (new) XnatPipelineLauncher and make sure this file has executable permissions.
 
-    This step steals execution from XNAT and shunts it to Python scripts if they are available.  Otherwise it passes control back to XNAT's native pipeline launcher.
+    This step steals execution from XNAT and shunts it to a Python script if it is available.  Otherwise it passes control back to XNAT's native pipeline launcher.
 
 Install XnatPythonLauncher in $PIPELINE_HOME/bin with executable permissions.
 
@@ -38,13 +38,11 @@ Install xnnppx.py in your Python path.
 
 CREATING A PYTHON PIPELINE
 
-Simply create a Python script with extension .py in the same directory as the XML pipeline descriptor (typically in $PIPELINE_HOME/catalog/...).  XnatPipelineLauncher detects this script and launches it with XnatPythonLauncher rather than the native XNAT pipeline launcher.
+Create a Python script with extension .py in the same directory as the XML pipeline descriptor (typically in $PIPELINE_HOME/catalog/.../).  XnatPipelineLauncher detects this script and launches it with XnatPythonLauncher instead of the native XNAT pipeline launcher.
 
 See sample.* for an example.  Install sample.py in a subdirectory of $PIPELINE_HOME/catalog, for instance $PIPELINE_HOME/catalog/local/sample.py.  XNAT will need an XML descriptor of the pipeline in order to launch it; this can be created by describing the pipeline as a Python or YAML dictionary (see sample.info) and converting it with create_workflow_xml.  Put the result in $PIPELINE_HOME/catalog/local/sample.xml.
 
-The script can access the pipeline arguments and parameters in the dictionaries xnnppx.parameters and xnnppx.arguments.  Because any parameters may have more than one value, the values in xnnppx.parameters are all lists of parameter values.
-
-xnnppx.send_mail(to_addrs, subject, body) can be used to send mail.
+The Python script can access the pipeline arguments and parameters in the dictionaries xnnppx.parameters and xnnppx.arguments.  Because any parameters may have more than one value, the values in xnnppx.parameters are all lists of parameter values.
 
 XnatPythonLauncher will redirect output to a log file (typically in $PIPELINE_HOME/logs), update XNAT (more specifically, the workflow XML) with the workflow execution environment and pass control to the Python script.  Once the script has started, it is then responsible for updating the workflow XML, which can be done by calling:
 
@@ -54,17 +52,19 @@ XnatPythonLauncher will redirect output to a log file (typically in $PIPELINE_HO
 
     xnnppx.workflow_info.fail([step_description])
 
-xnnppx.ContextManager may be used to automatically mark the workflow XML complete using xnnppx.workflow_info.complete() or xnnppx.workflow_info.fail() as appropriate and send a success or failure e-mail as specified by the notify_flag (-supressNotification) and notify_emails (-notify) arguments.
+xnnppx.ContextManager may be used to automatically mark the workflow XML complete using xnnppx.workflow_info.complete() or xnnppx.workflow_info.fail() as appropriate and send a success or failure e-mail as specified by the notify_flag (-supressNotification) and notify_emails (-notify) arguments.  See sample.py for an example.
+
+xnnppx.send_mail(to_addrs, subject, body) can be used to send mail.
 
 LAUNCHING A PIPELINE
 
-First a pipeline needs to be added to XNAT, then to the project.  As a site administrator, go to Administer -> Pipelines, then select Add Pipeline to Repository.  Give the full path to the XML pipeline descriptor (/.../pipeline/catalog/.../sample.xml); you may leave the second line blank.  Then the pipeline needs to be added to each project it will apply to.  As a site or project administrator, go to the project, then select Pipelines, Add More Pipelines, and Add for the pipeline you want to add.  No changes are needed to this form, but you may choose to select the pipeline for automatic running when data is archived to the project.
+For XNAT to manage a pipeline, it must first be added to XNAT, and then to a project.  As a site administrator, go to Administer -> Pipelines, then select Add Pipeline to Repository.  Give the full path to the XML pipeline descriptor ($PIPELINE_HOME/catalog/.../sample.xml); you may leave the second line blank.  Then the pipeline needs to be added to each project it will apply to.  As a site or project administrator, go to the project, then select Pipelines, Add More Pipelines, and Add for the pipeline you want to add.  No changes are needed to this form, but you may choose to select the pipeline for automatic running when data is archived to the project.
 
 There are (at least) four ways of launching an XNAT pipeline: automatically on archiving, through the web interface, using a REST call, and from the XNAT server command line.
 
 If you choose for the pipeline to be automatically launched on data archive (see above), it will be launched automatically after the Transfer and AutoRun pipelines have completed.
 
-To launch a pipeline from the XNAT web interface, you will first need to create the launching mechanism.  As a site administrator, go to Administer -> Data Types -> xnat:mrSessionData (or whatever data type you want to work on) -> Edit, then adding under Available Report Actions, set:
+To launch a pipeline from the XNAT web interface, you will first need to create the launching mechanism.  As a site administrator, go to Administer -> Data Types -> xnat:mrSessionData (or whatever data type you want to work on) -> Edit, then under Available Report Actions, set:
 
     Name:                  PipelineScreen_launch_pipeline
     Display Name:          Launch Pipeline
@@ -79,6 +79,16 @@ Now the MR Session pages will have a Launch Pipeline option in the Actions menu;
 
 See also http://xnatdev.wikispaces.com/Pipeline+Engine.
 
-To start a pipeline using a REST call, POST the XML for the pipeline to be launched to /data/archive/projects/{PROJECT}/pipelines/{NAME}/experiments/{EXPERIMENT_ID}.  The pipeline names for a project can be found using a GET to /data/archive/projects/{PROJECT}/pipelines, and a GET to the POST location will give template XML that can then be edited and used for the POST.
+To start a pipeline using a REST call, POST the XML for the pipeline to be launched to /data/archive/projects/{PROJECT}/pipelines/{NAME}/experiments/{EXPERIMENT_ID}.  The pipeline names for a project can be found using a GET to /data/archive/projects/{PROJECT}/pipelines, and a GET to the POST location above will give template XML that can then be edited and used for the POST.  For example:
 
-If you have access to the XNAT server, you can launch pipelines from the command line.  XnatPipelineLauncher may be called directly; this is useful if a pipeline fails and the full command line is available in the logs.  Similarly, XnatPythonLauncher may be called directly if the full command line is known.  XnatPythonLauncher sends all its output to a log file by default, but if XNAT_PYTHON_NOLOG is defined, output is not redirected.
+    GET /data/archive/projects/mystudy
+
+will give us the pipelines available for the project "mystudy."  If we find one called "sample," we can then:
+
+    GET /data/archive/projects/mystudy/pipelines/sample/experiments/myxnat_E00001
+
+to get template XML for this pipeline, and (after modifying the parameters in the XML as needed), send it back with a POST to launch the pipeline:
+
+    POST /data/archive/projects/mystudy/pipelines/sample/experiments/myxnat_E00001
+
+If you have access to the XNAT server, you can launch pipelines from the command line.  XnatPipelineLauncher can be called directly; this is useful if a pipeline fails and the full command line is available in the logs.  Similarly, XnatPythonLauncher can be called directly if the full command line is known.  XnatPythonLauncher sends all its output to a log file by default, but if XNAT_PYTHON_NOLOG is defined, output is not redirected and will be displayed at the command line.
