@@ -58,8 +58,27 @@ xnnppx.ContextManager may be used to automatically mark the workflow XML complet
 
 LAUNCHING A PIPELINE
 
-setting up xnat
+First a pipeline needs to be added to XNAT, then to the project.  As a site administrator, go to Administer -> Pipelines, then select Add Pipeline to Repository.  Give the full path to the XML pipeline descriptor (/.../pipeline/catalog/.../sample.xml); you may leave the second line blank.  Then the pipeline needs to be added to each project it will apply to.  As a site or project administrator, go to the project, then select Pipelines, Add More Pipelines, and Add for the pipeline you want to add.  No changes are needed to this form, but you may choose to select the pipeline for automatic running when data is archived to the project.
 
-REST call
+There are (at least) four ways of launching an XNAT pipeline: automatically on archiving, through the web interface, using a REST call, and from the XNAT server command line.
 
-XNAT_PYTHON_NOLOG
+If you choose for the pipeline to be automatically launched on data archive (see above), it will be launched automatically after the Transfer and AutoRun pipelines have completed.
+
+To launch a pipeline from the XNAT web interface, you will first need to create the launching mechanism.  As a site administrator, go to Administer -> Data Types -> xnat:mrSessionData (or whatever data type you want to work on) -> Edit, then adding under Available Report Actions, set:
+
+    Name:                  PipelineScreen_launch_pipeline
+    Display Name:          Launch Pipeline
+    Grouping:
+    Image:                 wrench.gif
+    Popup:                 sometimes
+    Secure Access:         edit
+    Additional Parameters:
+    Sequence:              16
+
+Now the MR Session pages will have a Launch Pipeline option in the Actions menu; click on this and follow the prompts to start the pipeline.
+
+See also http://xnatdev.wikispaces.com/Pipeline+Engine.
+
+To start a pipeline using a REST call, POST the XML for the pipeline to be launched to /data/archive/projects/{PROJECT}/pipelines/{NAME}/experiments/{EXPERIMENT_ID}.  The pipeline names for a project can be found using a GET to /data/archive/projects/{PROJECT}/pipelines, and a GET to the POST location will give template XML that can then be edited and used for the POST.
+
+If you have access to the XNAT server, you can launch pipelines from the command line.  XnatPipelineLauncher may be called directly; this is useful if a pipeline fails and the full command line is available in the logs.  Similarly, XnatPythonLauncher may be called directly if the full command line is known.  XnatPythonLauncher sends all its output to a log file by default, but if XNAT_PYTHON_NOLOG is defined, output is not redirected.
