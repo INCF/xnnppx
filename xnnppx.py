@@ -1,6 +1,8 @@
 # See file COPYING distributed with the xnnppx package for the copyright 
 # and license.
 
+"""XNAT Python workflow module"""
+
 import sys
 import os
 import traceback
@@ -12,6 +14,14 @@ import xml.dom.minidom
 import suds.client
 import suds.xsd.doctor
 import suds.transport.http
+
+# the following variables are set by XnatPythonLauncher:
+#     arguments
+#     from_email
+#     log_file
+#     mail_host
+#     parameters
+#     workflow_info
 
 class WorkflowNotFoundError(Exception):
     """workflow not found"""
