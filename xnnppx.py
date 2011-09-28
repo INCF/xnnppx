@@ -95,6 +95,7 @@ class _WorkflowInfo:
             status = workflow_node.getAttribute('status').lower()
             if status in ('queued', 'awaiting action', 'hold'):
                 self._doc = doc
+                self.id = w_id
                 break
         if self._doc is None:
             raise WorkflowNotFoundError
