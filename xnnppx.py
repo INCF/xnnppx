@@ -201,6 +201,8 @@ class _WorkflowInfo:
         return
 
 def send_mail(to_addrs, subject, body):
+    if not isinstance(to_addrs, (tuple, list)):
+        raise TypeError, 'send_mail() expects a tuple or list of recipients'
     if not to_addrs:
         return
     message = email.message.Message()
