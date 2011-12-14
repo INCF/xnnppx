@@ -8,12 +8,14 @@ import os
 import traceback
 import datetime
 import urllib2
+import urlparse
 import smtplib
 import email.mime.text
 import xml.dom.minidom
 import suds.client
 import suds.xsd.doctor
 import suds.transport.http
+import pyxnat
 
 # the following variables are set by XnatPythonLauncher:
 #     arguments
@@ -26,6 +28,14 @@ import suds.transport.http
 class WorkflowNotFoundError(Exception):
     """workflow not found"""
 
+class HTTPSudsPreprocessor(urllib2.BaseHandler):
+
+    def http_request(self, req):
+        req.add_header('Cookie', 'JSESSIONID=%s' % self.jsessionid)
+        return req
+
+    https_request = http_request
+
 class _WorkflowInfo:
 
     """class for mirroring workflow information (XML) in XNAT"""
@@ -34,17 +44,17 @@ class _WorkflowInfo:
               jws, 
               operation, 
               inputs, 
-              authenticated=False, 
               fix_import=False):
         """perform a SOAP call"""
         url = '%s/axis/%s' % (self._base_url, jws)
-        if authenticated:
-            t = suds.transport.http.HttpAuthenticated(username=self._username, 
-                                                      password=self._password)
+        if urlparse.urlparse(url).scheme == 'https':
+            t = suds.transport.https.HttpTransport()
         else:
             t = suds.transport.http.HttpTransport()
-        if self._cookiejar is not None:
-            t.cookiejar = self._cookiejar
+        t.urlopener = urllib2.build_opener(HTTPSudsPreprocessor)
+        for h in t.urlopener.handlers:
+            if isinstance(h, HTTPSudsPreprocessor):
+                h.jsessionid = self._session
         if fix_import:
             xsd_url = 'http://schemas.xmlsoap.org/soap/encoding/'
             imp = suds.xsd.doctor.Import(xsd_url)
@@ -64,20 +74,14 @@ class _WorkflowInfo:
         client.set_options(location=url)
         f = getattr(client.service, operation)
         result = f(*typed_inputs)
-        if self._cookiejar is None:
-            self._cookiejar = t.cookiejar
         return result
 
     def __init__(self, base_url, username, password, workflow_id):
         self._base_url = base_url
-        self._username = username
-        self._password = password
-        self._cookiejar = None
-        res = self._call('CreateServiceSession.jws', 
-                         'execute', 
-                         (), 
-                         authenticated=True)
-        self._session = str(res)
+
+        i = pyxnat.Interface(base_url, username, password)
+        i._get_entry_point()
+        self._session = i._jsession[11:]
         args = (('ns1:string', self._session), 
                 ('ns1:string', 'wrk:workflowData.ID'), 
                 ('ns1:string', '='), 
@@ -88,7 +92,7 @@ class _WorkflowInfo:
         for w_id in workflow_ids:
             url = '%s/app/template/XMLSearch.vm/id/%s/data_type/wrk:workflowData' % (self._base_url, str(w_id))
             r = urllib2.Request(url)
-            self._cookiejar.add_cookie_header(r)
+            r.add_header('Cookie', 'JSESSIONID=%s' % self._session)
             data = urllib2.urlopen(r).read()
             doc = xml.dom.minidom.parseString(data)
             workflow_node = doc.getElementsByTagName('wrk:Workflow')[0]
@@ -115,7 +119,6 @@ class _WorkflowInfo:
         self._call('StoreXML.jws', 
                    'store', 
                    inputs, 
-                   authenticated=True, 
                    fix_import=True)
         return
 
