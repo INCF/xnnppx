@@ -28,7 +28,11 @@ CONTENTS
 
 INSTALLATION
 
-Xnnppx requires Suds: https://fedorahosted.org/suds/.
+Xnnppx requires:
+
+    Suds: https://fedorahosted.org/suds/
+
+    pyxnat: http://packages.python.org/pyxnat/
 
 In $PIPELINE_HOME (typically $XNAT_HOME/pipeline), move
 bin/XnatPipelineLauncher to bin/XnatPipelineLauncher.orig and replace
