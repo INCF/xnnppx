@@ -78,15 +78,22 @@ class _WorkflowInfo:
 
     def __init__(self, base_url, username, password, workflow_id):
         self._base_url = base_url
-
+        self._username = username
+        self._password = password
+        
         i = pyxnat.Interface(base_url, username, password)
         i._get_entry_point()
         self._session = i._jsession[11:]
-        args = (('ns1:string', self._session), 
-                ('ns1:string', 'wrk:workflowData.ID'), 
-                ('ns1:string', '='), 
-                ('ns1:string', workflow_id), 
-                ('ns1:string', 'wrk:workflowData'))
+        # if http://schemas.xmlsoap.org/soap/encoding/ > self._base_url
+        # we need to change the prefix
+        prefix = 'ns0'
+        if 'http://schemas.xmlsoap.org/soap/encoding/' > self._base_url:
+            prefix = 'ns1'
+        args = (('%s:string' % (prefix), self._session), 
+                ('%s:string' % (prefix), 'wrk:workflowData.ID'), 
+                ('%s:string' % (prefix), '='), 
+                ('%s:string' % (prefix), workflow_id), 
+                ('%s:string' % (prefix), 'wrk:workflowData'))
         workflow_ids = self._call('GetIdentifiers.jws', 'search', args)
         self._doc = None
         for w_id in workflow_ids:
@@ -112,6 +119,11 @@ class _WorkflowInfo:
 
     def _update_xnat(self):
         """update XNAT with the current state of this (WorkflowInfo) object"""
+        # get a new jsession id to avoid timeout
+        i = pyxnat.Interface(self._base_url, self._username, self._password)
+        i._get_entry_point()
+        self._session = i._jsession[11:]
+        
         inputs = (('ns0:string', self._session), 
                   ('ns0:string', self._doc.toxml()), 
                   ('ns0:boolean', False), 
