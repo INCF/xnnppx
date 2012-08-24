@@ -45,7 +45,8 @@ file has executable permissions.
     to XNAT's native pipeline launcher.
 
 Install XnatPythonLauncher in $PIPELINE_HOME/bin with executable
-permissions.
+permissions.  Change the value for the pipeline config file name 
+in the default arguments in the definitions and defaults section.
 
     If XnatPipelineLauncher finds a Python script that needs to be
     run, it calls this script, which takes the parameters passed
