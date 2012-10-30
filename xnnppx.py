@@ -16,6 +16,7 @@ import suds.client
 import suds.xsd.doctor
 import suds.transport.http
 import pyxnat
+import time
 
 # the following variables are set by XnatPythonLauncher:
 #     arguments
@@ -77,6 +78,8 @@ class _WorkflowInfo:
         return result
 
     def __init__(self, base_url, username, password, workflow_id):
+        # added these variables to pass to other functions
+        # they are needed to make a new JSESSION id
         self._base_url = base_url
         self._username = username
         self._password = password
@@ -94,22 +97,71 @@ class _WorkflowInfo:
                 ('%s:string' % (prefix), '='), 
                 ('%s:string' % (prefix), workflow_id), 
                 ('%s:string' % (prefix), 'wrk:workflowData'))
-        workflow_ids = self._call('GetIdentifiers.jws', 'search', args)
+        
         self._doc = None
-        for w_id in workflow_ids:
-            url = '%s/app/template/XMLSearch.vm/id/%s/data_type/wrk:workflowData' % (self._base_url, str(w_id))
-            r = urllib2.Request(url)
-            r.add_header('Cookie', 'JSESSIONID=%s' % self._session)
-            data = urllib2.urlopen(r).read()
-            doc = xml.dom.minidom.parseString(data)
-            workflow_node = doc.getElementsByTagName('wrk:Workflow')[0]
-            status = workflow_node.getAttribute('status').lower()
-            if status in ('queued', 'awaiting action', 'hold'):
-                self._doc = doc
-                self.id = int(w_id)
-                break
+        
+        try:
+            workflow_ids = self._call('GetIdentifiers.jws', 'search', args)
+            for w_id in workflow_ids:
+                url = '%s/app/template/XMLSearch.vm/id/%s/data_type/wrk:workflowData' % (self._base_url, str(w_id))
+                r = urllib2.Request(url)
+                r.add_header('Cookie', 'JSESSIONID=%s' % self._session)
+                data = urllib2.urlopen(r).read()
+                doc = xml.dom.minidom.parseString(data)
+                workflow_node = doc.getElementsByTagName('wrk:Workflow')[0]
+                status = workflow_node.getAttribute('status').lower()
+                if status in ('queued', 'awaiting action', 'hold'):
+                    self._doc = doc
+                    self.id = int(w_id)
+                    break
+        except Exception: # Continue if self._call fails because there are no workflow entries, catch other exceptions
+            traceback.print_exc(file=sys.stdout)
+            
         if self._doc is None:
-            raise WorkflowNotFoundError
+            # this is a fix for 1.6.1, in that version, workflow is generated at a different step, so it does not exist by now
+            # make initial_xml manually, then store in self._doc and call _update_xnat()
+            server= arguments['host']
+            pipeline_name = arguments['pipeline']
+            project_name = arguments['project']
+            data_type = arguments['dataType']
+            launch_time = time.strftime('%Y-%m-%dT%X')
+            initial_xml = xml.dom.minidom.Document()
+            wrk = initial_xml.createElement("wrk:Workflow")
+            wrk.setAttribute('data_type', data_type)
+            wrk.setAttribute('ID', workflow_id)
+            wrk.setAttribute('ExternalID', project_name)
+            wrk.setAttribute('current_step_launch_time', launch_time)
+            wrk.setAttribute('status', 'Running')
+            wrk.setAttribute('pipeline_name', pipeline_name)
+            wrk.setAttribute('launch_time', launch_time)
+            wrk.setAttribute('percentageComplete', "0.0")
+            
+            # may want to get this info somewhow instead of hardcoding
+            wrk.setAttribute('xmlns:arc', 'http://nrg.wustl.edu/arc')
+            wrk.setAttribute('xmlns:val', 'http://nrg.wustl.edu/val')
+            wrk.setAttribute('xmlns:pipe', 'http://nrg.wustl.edu/pipe')
+            wrk.setAttribute('xmlns:wrk', 'http://nrg.wustl.edu/workflow')
+            wrk.setAttribute('xmlns:scr', 'http://nrg.wustl.edu/scr')
+            wrk.setAttribute('xmlns:xdat', 'http://nrg.wustl.edu/security')
+            wrk.setAttribute('xmlns:cat', 'http://nrg.wustl.edu/catalog')
+            wrk.setAttribute('xmlns:prov', 'http://www.nbirn.net/prov')
+            wrk.setAttribute('xmlns:xnat', 'http://nrg.wustl.edu/xnat')
+            wrk.setAttribute('xmlns:xnat_a', 'http://nrg.wustl.edu/xnat_assessments')
+            wrk.setAttribute('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance')
+            wrk.setAttribute('xsi:schemaLocation', 
+                             'http://nrg.wustl.edu/workflow {0}/schemas/pipeline/workflow.xsd http://nrg.wustl.edu/catalog '.format(server) +
+                             '{0}/schemas/catalog/catalog.xsd http://nrg.wustl.edu/pipe {0}/schemas/pipeline/repository.xsd '.format(server) +
+                             'http://nrg.wustl.edu/scr {0}/schemas/screening/screeningAssessment.xsd http://nrg.wustl.edu/arc '.format(server) +
+                             '{0}/schemas/project/project.xsd http://nrg.wustl.edu/val {0}/schemas/validation/protocolValidation.xsd '.format(server) +
+                             'http://nrg.wustl.edu/xnat {0}/schemas/xnat/xnat.xsd http://nrg.wustl.edu/xnat_assessments '.format(server) +
+                             '{0}/schemas/assessments/assessments.xsd http://www.nbirn.net/prov {0}/schemas/birn/birnprov.xsd '.format(server) +
+                             'http://nrg.wustl.edu/security {0}/schemas/security/security.xsd'.format(server)
+                             )
+            initial_xml.appendChild(wrk)
+            
+            self._doc = initial_xml
+            self._update_xnat()
+            
         return
 
     def _close(self):
@@ -119,11 +171,10 @@ class _WorkflowInfo:
 
     def _update_xnat(self):
         """update XNAT with the current state of this (WorkflowInfo) object"""
-        # get a new jsession id to avoid timeout
+        # get a new JESSSION id to avoid timeout, which will cause the pipeline to fail
         i = pyxnat.Interface(self._base_url, self._username, self._password)
         i._get_entry_point()
         self._session = i._jsession[11:]
-        
         inputs = (('ns0:string', self._session), 
                   ('ns0:string', self._doc.toxml()), 
                   ('ns0:boolean', False), 
